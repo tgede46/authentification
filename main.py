@@ -1,4 +1,5 @@
 from fastapi import FastAPI, status,Depends,HTTPException
+from sqlmodel import SQLModel
 import models
 from database import engine, SessionLocal
 from typing import Annotated
@@ -9,7 +10,7 @@ import auth
 app=FastAPI()
 app.include_router(auth.router)
 
-models.Base.metadata.create_all(bind=engine)
+SQLModel.metadata.create_all(bind=engine)
 
 
 def get_db():
