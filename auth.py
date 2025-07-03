@@ -101,16 +101,15 @@ async def forgot_password(forgot_request: ForgotPasswordRequest, db: db_dependan
             status_code=status.HTTP_404_NOT_FOUND,
             detail='utilisateur non trouvé'
         )
-    # mon probleme ici 
+    # mon probleme est ici
     token = create_user_token(user.username, user.id, timedelta(minutes=15))
     return Token(access_token=token, token_type='bearer')
 
 def authenticate_forgot_password(username:str,db):
     user=db.query(User).filter(User.username==username).first()
     if not user:
-        return False
-    if not bcrypt_context.verify(username):
-        return False
+        return None
+    return user
     
 @router.post('/reset-password')
 async def reset_password(reset_request: ResetPasswordRequest, db: db_dependancy):
@@ -140,7 +139,4 @@ async def reset_password(reset_request: ResetPasswordRequest, db: db_dependancy)
     
     return {'message': 'mot de passe réinitialisé avec succès'}
 
-# router = FastAPI(prefix='/arti', tags=['articles'])
-# @router.get('/articles')    
-# def get_articles():
-#     pass
+

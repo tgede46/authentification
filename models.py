@@ -14,9 +14,6 @@ class User(Base):
     hashed_password=Column(String)
 
 #     articles: List["Article"] = Relationship(back_populates="user")
-#     def __repr__(self) -> str:
-#         return f"user:{self.username}"
-
 # class Article(Base):
 #     __tablename__='article'
     
@@ -27,3 +24,4 @@ class User(Base):
 
 
 #     user: Optional[User] = Relationship(back_populates="articles")
+
