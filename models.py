@@ -6,7 +6,7 @@ class Article(SQLModel, table=True):
     title: str
     quantity: int
     username: Optional[str] = Field(default=None, foreign_key="user.username")
-
+    # user_id: Optional[int] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="articles")
 
 class User(SQLModel, table=True):
