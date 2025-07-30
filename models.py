@@ -11,7 +11,7 @@ class Article(SQLModel, table=True):
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
-    username: str = Field(index=True, unique=True)
+    username: str
     mail: str = Field(unique=True)
     hashed_password: str
 

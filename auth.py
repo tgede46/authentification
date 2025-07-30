@@ -30,11 +30,15 @@ class  CreateUserRequest(BaseModel):
     password: str
 
 class ForgotPasswordRequest(BaseModel):
-    username: str
-
+    mail: str
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
 class Token(BaseModel):
     access_token: str
     token_type: str
+    
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -71,18 +75,51 @@ async def create_user(db:db_dependancy,create_user_request:CreateUserRequest):
             'mail':create_user_model.mail,
             'password':create_user_model.hashed_password}
 
-@router.post('/login', response_model=Token,tags=['auth'])
+@router.post('/login', response_model=TokenResponse, tags=['auth'])
 async def login_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
                              db: db_dependancy):
-    user = authenticate_user(form_data.username, form_data.password, db)
-    if not user:
+    user = db.query(User).filter(User.mail == form_data.username).first()
+    if not user or not bcrypt_context.verify(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='erreur nom d utilisateur'
+            detail='erreur mail ou mot de passe'
         )
-    token = create_user_token(user.username, user.id, timedelta(minutes=25))
-    return Token(access_token=token, token_type='bearer')
+    access_token = create_user_token(user.username, user.id, timedelta(minutes=25))
+    refresh_token = create_refresh_token(user.username, user.id, timedelta(days=7))
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type='bearer'
+    )
 
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+@router.post('/refresh', response_model=Token)
+async def refresh_access_token(refresh_request: RefreshTokenRequest, db: db_dependancy):
+    try:
+        payload = jwt.decode(refresh_request.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get('sub')
+        user_id: int = payload.get('id')
+        if username is None or user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='refresh token invalide'
+            )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='refresh token invalide'
+        )
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='utilisateur non trouvé'
+        )
+    access_token = create_user_token(user.username, user.id, timedelta(minutes=25))
+    return Token(access_token=access_token, token_type='bearer')
 
 
 def authenticate_user(username: str, password: str, db):
@@ -100,20 +137,27 @@ def create_user_token(username: str, user_id: int, expires_delta: timedelta):
     encode.update({'exp': expire})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
-@router.post('/forgot-password', response_model=Token,tags=['auth'])
+
+def create_refresh_token(username: str, user_id: int, expires_delta: timedelta):
+    encode = {'sub': username, 'id': user_id}
+    expire = datetime.utcnow() + expires_delta
+    encode.update({'exp': expire})
+    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+@router.post('/forgot-password', response_model=Token, tags=['auth'])
 async def forgot_password(forgot_request: ForgotPasswordRequest, db: db_dependancy):
-    user = authenticate_forgot_password(forgot_request.username, db)
+    user = authenticate_forgot_password(forgot_request.mail, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='utilisateur non trouvé'
         )
-
-    token = create_user_token(user.username, user.id, timedelta(minutes=15))
+    token = create_user_token(user.mail, user.id, timedelta(minutes=15))
     return Token(access_token=token, token_type='bearer')
 
-def authenticate_forgot_password(username:str,db):
-    user=db.query(User).filter(User.username==username).first()
+def authenticate_forgot_password(mail: str, db):
+    user = db.query(User).filter(User.mail == mail).first()
     if not user:
         return None
     return user
